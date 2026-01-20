@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 export default defineConfig({
+  base: "/Discount/",
   plugins: [
     react(),
     tailwindcss(),
@@ -14,7 +15,8 @@ export default defineConfig({
         name: "Descuento",
         short_name: "Descuento",
         description: "Calculadora rápida de descuentos",
-        start_url: "/",
+        start_url: "/Discount/",
+        scope: "/Discount/",
         display: "standalone",
         background_color: "#ffffff",
         theme_color: "#ffffff",
