@@ -7,7 +7,7 @@ import {
   parseMoneyToNumber,
 } from "./lib/discount";
 
-const QUICK = [10, 20, 30, 40, 50, 70];
+const QUICK = [10, 20, 30, 40, 50, 60, 70, 80];
 
 export default function App() {
   const [priceInput, setPriceInput] = useState("");
@@ -56,7 +56,6 @@ export default function App() {
       selection?.removeAllRanges();
       selection?.addRange(range);
 
-      // Nota: a veces devuelve false aunque copie, pero suele funcionar
       const ok = document.execCommand("copy");
 
       selection?.removeAllRanges();
@@ -75,7 +74,6 @@ export default function App() {
 
     let ok = false;
 
-    // Clipboard moderno (mejor en HTTPS / PWA instalada)
     try {
       await navigator.clipboard.writeText(text);
       ok = true;
@@ -83,7 +81,6 @@ export default function App() {
       ok = false;
     }
 
-    // Fallback para local/http o Safari quisquilloso
     if (!ok) ok = legacyCopy(text);
 
     showToast(ok ? "Precio copiado" : "No se pudo copiar");
@@ -138,41 +135,14 @@ export default function App() {
               aria-label="Porcentaje de descuento"
             />
 
-            <div className="mt-3 flex items-center gap-2">
-              <button
-                onClick={() => setPct((p) => Math.max(0, p - 1))}
-                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50 active:scale-[0.99]"
-              >
-                −1
-              </button>
-              <button
-                onClick={() => setPct((p) => Math.max(0, p - 5))}
-                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50 active:scale-[0.99]"
-              >
-                −5
-              </button>
-              <div className="flex-1" />
-              <button
-                onClick={() => setPct((p) => Math.min(90, p + 5))}
-                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50 active:scale-[0.99]"
-              >
-                +5
-              </button>
-              <button
-                onClick={() => setPct((p) => Math.min(90, p + 1))}
-                className="rounded-xl border border-zinc-200 bg-white px-3 py-2 text-sm font-medium hover:bg-zinc-50 active:scale-[0.99]"
-              >
-                +1
-              </button>
-            </div>
-
-            <div className="mt-3 flex flex-wrap gap-2">
+            {/* Botones rápidos en 2 filas (4 columnas) */}
+            <div className="mt-4 grid grid-cols-4 gap-2">
               {QUICK.map((v) => (
                 <button
                   key={v}
                   onClick={() => setPct(v)}
                   className={
-                    "rounded-full px-3 py-1 text-sm font-medium " +
+                    "h-10 rounded-xl text-sm font-semibold transition active:scale-[0.99] " +
                     (pct === v
                       ? "bg-zinc-900 text-white"
                       : "bg-zinc-100 text-zinc-800 hover:bg-zinc-200")
