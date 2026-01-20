@@ -1,0 +1,15 @@
+@import "tailwindcss";
+
+/* Base “Apple-like” (opcional pero recomendado) */
+:root {
+  color-scheme: light;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
