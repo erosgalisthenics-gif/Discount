@@ -13,22 +13,65 @@ function WheelPercent({
   value,
   min = 0,
   max = 90,
+  step = 10,
   onChange,
 }: {
   value: number;
   min?: number;
   max?: number;
+  step?: number;
   onChange: (v: number) => void;
 }) {
   const ITEM_H = 44;
+
   const containerRef = useRef<HTMLDivElement | null>(null);
   const rafRef = useRef<number | null>(null);
   const lastValRef = useRef<number>(value);
 
-  const baseValues = useMemo(
-    () => Array.from({ length: max - min + 1 }, (_, i) => min + i),
-    [min, max]
-  );
+  // --- Sonido tipo “tick” (similar a rueda, no es el sonido propietario de Apple) ---
+  const audioRef = useRef<AudioContext | null>(null);
+
+  function ensureAudio() {
+    const AC = (window.AudioContext ||
+      (window as any).webkitAudioContext) as typeof AudioContext | undefined;
+    if (!AC) return;
+
+    if (!audioRef.current) audioRef.current = new AC();
+    if (audioRef.current.state === "suspended") {
+      audioRef.current.resume().catch(() => {});
+    }
+  }
+
+  function playTick() {
+    const ctx = audioRef.current;
+    if (!ctx || ctx.state !== "running") return;
+
+    const t0 = ctx.currentTime;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    // Un “click” corto tipo rueda/seguro
+    osc.type = "square";
+    osc.frequency.setValueAtTime(1200, t0);
+
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(0.14, t0 + 0.003);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.03);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(t0);
+    osc.stop(t0 + 0.04);
+  }
+
+  // --- Valores (de 10 en 10) ---
+  const baseValues = useMemo(() => {
+    const out: number[] = [];
+    for (let v = min; v <= max; v += step) out.push(v);
+    return out;
+  }, [min, max, step]);
 
   // Repetimos 3 veces para simular "infinito"
   const items = useMemo(
@@ -36,21 +79,28 @@ function WheelPercent({
     [baseValues]
   );
   const baseLen = baseValues.length;
-  const midStartIndex = baseLen; // inicio del bloque central
+  const midStartIndex = baseLen;
+
+  // “Snap” del valor al múltiplo de step
+  const snappedValue = useMemo(() => {
+    const clamped = Math.min(max, Math.max(min, value));
+    const snapped = Math.round((clamped - min) / step) * step + min;
+    return Math.min(max, Math.max(min, snapped));
+  }, [value, min, max, step]);
 
   // Scroll al valor actual en el bloque central
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    const targetIndex = midStartIndex + (value - min);
+    const offset = Math.round((snappedValue - min) / step);
+    const targetIndex = midStartIndex + offset;
     const targetTop = targetIndex * ITEM_H;
 
-    // Evita saltos si ya estamos cerca
     if (Math.abs(el.scrollTop - targetTop) > ITEM_H) {
       el.scrollTop = targetTop;
     }
-  }, [value, min, ITEM_H, midStartIndex]);
+  }, [snappedValue, min, step, ITEM_H, midStartIndex]);
 
   function maybeVibrate() {
     // En iOS normalmente NO vibra en web, en Android sí.
@@ -64,13 +114,9 @@ function WheelPercent({
   }
 
   function normalizeToMiddle(el: HTMLDivElement) {
-    // Mantener el scroll en el bloque central para "infinito"
     const idx = Math.round(el.scrollTop / ITEM_H);
-    if (idx < baseLen) {
-      el.scrollTop += baseLen * ITEM_H;
-    } else if (idx >= baseLen * 2) {
-      el.scrollTop -= baseLen * ITEM_H;
-    }
+    if (idx < baseLen) el.scrollTop += baseLen * ITEM_H;
+    else if (idx >= baseLen * 2) el.scrollTop -= baseLen * ITEM_H;
   }
 
   function onScroll() {
@@ -88,21 +134,22 @@ function WheelPercent({
         lastValRef.current = next;
         onChange(next);
         maybeVibrate();
+        playTick();
       }
     });
   }
 
-  // Altura visible (5 ítems) y padding para centrar
-  const visibleCount = 5;
+  // Solo 3 valores visibles
+  const visibleCount = 3;
   const height = visibleCount * ITEM_H;
   const pad = (height - ITEM_H) / 2;
 
   return (
-    <div className="relative">
+    <div className="relative" onPointerDown={ensureAudio}>
       <div
         ref={containerRef}
         onScroll={onScroll}
-        className="h-[220px] w-full overflow-y-scroll rounded-2xl border border-zinc-200 bg-white shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="w-full overflow-y-scroll rounded-2xl border border-zinc-200 bg-white shadow-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{
           height,
           scrollSnapType: "y mandatory",
@@ -112,7 +159,7 @@ function WheelPercent({
         aria-label="Selector de porcentaje"
       >
         {items.map((v, i) => {
-          const isActive = v === value;
+          const isActive = v === snappedValue;
           return (
             <div
               key={`${v}-${i}`}
@@ -137,8 +184,8 @@ function WheelPercent({
       </div>
 
       {/* Fade superior/inferior tipo iOS */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-10 rounded-t-2xl bg-gradient-to-b from-white to-transparent" />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 rounded-b-2xl bg-gradient-to-t from-white to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-8 rounded-t-2xl bg-gradient-to-b from-white to-transparent" />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 rounded-b-2xl bg-gradient-to-t from-white to-transparent" />
     </div>
   );
 }
@@ -243,7 +290,7 @@ export default function App() {
 
           {showFormatHint && (
             <p className="mt-2 text-xs text-zinc-500">
-              Usa coma o punto para decimales.
+             luega usar coma o punto para decimales.
             </p>
           )}
 
@@ -258,7 +305,13 @@ export default function App() {
             </div>
 
             <div className="mt-3">
-              <WheelPercent value={pct} min={0} max={90} onChange={setPct} />
+              <WheelPercent
+                value={pct}
+                min={0}
+                max={90}
+                step={10}
+                onChange={setPct}
+              />
             </div>
 
             <div className="mt-4 grid grid-cols-4 gap-2">
